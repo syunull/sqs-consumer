@@ -2012,7 +2012,6 @@ dependencies = [
 name = "sqs-consumer"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-trait",
  "aws-config",
  "aws-sdk-sqs",
@@ -2021,7 +2020,6 @@ dependencies = [
  "opentelemetry_sdk",
  "pin-project",
  "rand",
- "thiserror",
  "tokio",
  "tokio-util",
  "tracing",

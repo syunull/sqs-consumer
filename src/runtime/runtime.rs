@@ -3,11 +3,11 @@ use std::sync::Arc;
 
 use aws_sdk_sqs::types::{DeleteMessageBatchRequestEntry, Message};
 use tokio::sync::mpsc::Sender;
-use tokio::sync::Notify;
+use tokio::sync::{Notify, Semaphore};
 use tokio_util::task::TaskTracker;
 
 use crate::aws::{AwsSqsClient, SqsClientConfig};
-use crate::runtime::{metrics::get_task_received_counter, BatchDeleter, Poller, SignalManager, Timer};
+use crate::runtime::{BatchDeleter, Poller, SignalManager, Timer};
 
 static DEFAULT_AWS_SQS_CONSUMER_POLLER_COUNT: usize = 1;
 
@@ -62,6 +62,9 @@ where
 
         self.set.spawn(SignalManager::new(notify.clone()));
 
+        let max_concurrency = self.poller_count * 4 + 1;
+        let semaphore = Arc::new(Semaphore::new(max_concurrency));
+
         loop {
             tokio::select! {
                 _ = notify.notified() => {
@@ -70,13 +73,27 @@ where
                 }
 
                 Some(msg) = msg_rx.recv() => {
-                    self.set.spawn(
-                        Self::run_internal(self.future_fn.clone(), msg, del_tx.clone())
+                    let semaphore = semaphore.clone();
+                    let permit = match semaphore.acquire_owned().await {
+                        Ok(permit) => permit,
+                        Err(e) => {
+                            tracing::error!("internal error getting permit: {}", e);
+                            continue;
+                        }
+                    };
+
+                    let future_fn = self.future_fn.clone();
+                    let del_tx = del_tx.clone();
+                    self.set.spawn(async move {
+                        Self::run_internal(future_fn, msg, del_tx).await;
+                        drop(permit);
+                    }
                     );
                 }
-
             }
         }
+        // consider draining msg_rx channel
+        drop(del_tx);
 
         self.set.close();
         self.set.wait().await;

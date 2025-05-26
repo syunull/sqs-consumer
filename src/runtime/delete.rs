@@ -41,10 +41,6 @@ where
         loop {
             tokio::select! {
                 _ = notify.notified() => {
-                    tracing::debug!("stopping deletion worker");
-                    while !self.buffer.is_empty() {
-                        self.delete_message_batch_internal().await;
-                    }
                     break
                 }
                 _ = ticker.tick() => {
@@ -59,6 +55,16 @@ where
                     }
                 }
             }
+        }
+
+        while let Some(msg) = self.channel.recv().await {
+            self.buffer.push(msg);
+            if self.buffer.len() >= 10 {
+                self.delete_message_batch_internal().await;
+            }
+        }
+        while !self.buffer.is_empty() {
+            self.delete_message_batch_internal().await;
         }
     }
 
