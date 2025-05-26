@@ -1,0 +1,102 @@
+services:
+  sqs-consumer:
+    container_name: sqs-consumer
+    environment:
+      AWS_ACCESS_KEY_ID: dummy
+      AWS_SECRET_ACCESS_KEY: dummy
+      AWS_SQS_QUEUE_URL: http://sqs:us-east-1:localhost:localstack:cloud:4566/000000000000/sqs-consumer
+      LOCALSTACK_ENDPOINT_URL: http://localstack:4566
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: sqs-consumer
+      RUST_BACKTRACE: '1'
+      RUST_LOG: none,sqs_consumer=debug,main=debug
+    build:
+      dockerfile: Dockerfile
+    networks:
+      - localstack
+    depends_on:
+      - localstack
+  cli:
+    container_name: localstack-cli
+    image: amazon/aws-cli
+    entrypoint: sleep
+    command:
+      - infinity
+    configs:
+      - source: aws_config
+        target: /root/.aws/config
+      - source: aws_credentials
+        target: /root/.aws/credentials
+    networks:
+      - localstack
+    depends_on:
+      - localstack
+  localstack:
+    container_name: "${LOCALSTACK_DOCKER_NAME:-localstack-main}"
+    image: localstack/localstack
+    ports:
+      - "127.0.0.1:4566:4566"
+      - "127.0.0.1:4510-4559:4510-4559"
+    environment:
+      # LocalStack configuration: https://docs.localstack.cloud/references/configuration/
+      - DEBUG=${DEBUG:-0}
+    volumes:
+      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - localstack
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib
+    configs:
+      - source: otel_collector
+        target: /etc/otelcol-contrib/config.yaml
+    networks:
+      - localstack
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-otlp-receiver'
+    configs:
+      - source: prometheus
+        target: /etc/prometheus/prometheus.yml
+    ports:
+      - "127.0.0.1:9090:9090"
+    networks:
+      - localstack
+networks:
+  localstack:
+configs:
+  aws_config:
+    content: |
+      [default]
+      region=us-east-1
+      output=json
+      endpoint_url = http://localstack:4566
+  aws_credentials:
+    content: |
+      [default]
+      aws_access_key_id=dummy
+      aws_secret_access_key=dummy
+  otel_collector:
+    content: |
+      receivers:
+        otlp:
+          protocols:
+            http:
+              endpoint: 0.0.0.0:4318
+      exporters:
+        prometheus:
+          endpoint: 0.0.0.0:8889
+      service:
+        pipelines:
+          metrics:
+            receivers: [otlp]
+            exporters: [prometheus]
+  prometheus:
+    content: |
+      scrape_configs:
+        - job_name: 'otel-collector'
+          static_configs:
+            - targets: ['otel-collector:8889']

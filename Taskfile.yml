@@ -1,0 +1,18 @@
+version: '3'
+
+tasks:
+  iac:
+    cmds:
+      - scripts/iac.sh
+    deps:
+      - localstack
+  localstack:
+    cmds:
+      - docker compose up -d --build --quiet-pull --no-color --remove-orphans
+      - for i in $(seq 1 20); do curl --fail -s http://localhost:4566//_localstack/health 1>/dev/null && break || sleep 1; done
+  shutdown:
+    cmds:
+      - docker compose down
+  default:
+    deps:
+      - iac

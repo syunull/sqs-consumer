@@ -1,0 +1,29 @@
+name: pre-commit
+# yamllint disable
+on:
+  # yamllint enable
+  pull_request:
+jobs:
+  integration-tests:
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - run: nix develop --command task
+      - run: nix develop --command task shutdown
+  pre-commit:
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit/
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml', 'flake.lock') }}
+      - run: nix develop --command pre-commit run --all-files
