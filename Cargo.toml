@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.98"
 async-trait = "0.1.88"
 aws-config = { version = "1", features = ["behavior-version-latest"] }
 aws-sdk-sqs = "1"
@@ -13,7 +12,6 @@ opentelemetry-otlp = "0.30.0"
 opentelemetry_sdk = "0.30.0"
 pin-project = "1.1.10"
 rand = "0.9.1"
-thiserror = "2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "tracing"] }
 tokio-util = { version = "0.7.15", features = ["rt"] }
 tracing = "0.1"

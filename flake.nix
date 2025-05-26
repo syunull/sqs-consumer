@@ -1,7 +1,7 @@
 {
   inputs = {
     nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2505.*.tar.gz";
-    rust-overlay.url = "github:oxalica/rust-overlay/stable"; # A helper for Rust + Nix
+    rust-overlay.url = "github:oxalica/rust-overlay/stable";
   };
 
   outputs =
@@ -26,8 +26,24 @@
       forAllSystems =
         f:
         nixpkgs.lib.genAttrs allSystems (system: f { pkgs = import nixpkgs { inherit overlays system; }; });
+
+      cargoToml = nixpkgs.lib.importTOML ./Cargo.toml;
     in
     {
+      packages = forAllSystems (
+        { pkgs }:
+        {
+          default = pkgs.rustPlatform.buildRustPackage {
+            pname = cargoToml.package.name;
+            version = cargoToml.package.version;
+            src = ./.;
+            cargoDeps = pkgs.rustPlatform.importCargoLock {
+              lockFile = ./Cargo.lock;
+            };
+          };
+        }
+      );
+
       devShells = forAllSystems (
         { pkgs }:
         {
@@ -48,6 +64,26 @@
             shellHook = ''
               alias awslocal="docker exec -t localstack-cli aws"
             '';
+          };
+        }
+      );
+
+      dockerImages = forAllSystems (
+        { pkgs }:
+        let
+          rustBin = self.packages.x86_64-linux.default;
+        in
+        {
+          default = pkgs.dockerTools.buildImage {
+            name = cargoToml.package.name;
+            tag = cargoToml.package.version;
+            created = "now";
+            copyToRoot = pkgs.buildEnv {
+              name = "${cargoToml.package.name}";
+              paths = [ rustBin ];
+              pathsToLink = [ "/bin" ];
+            };
+            config.Cmd = [ "/bin/main" ];
           };
         }
       );

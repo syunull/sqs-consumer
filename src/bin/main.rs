@@ -12,11 +12,11 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
     let env_filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new("info"))
-        .map_err(|e| format!("Failed to parse env filter: {}", e))?;
+        .map_err(|e| format!("Failed to parse env filter: {e}"))?;
 
     let collector = tracing_subscriber::registry().with(fmt::layer()).with(env_filter);
     tracing::subscriber::set_global_default(collector)
-        .map_err(|e| format!("failed to set global tracing default: {}", e))?;
+        .map_err(|e| format!("failed to set global tracing default: {e}"))?;
 
     let metric_exporter = opentelemetry_otlp::MetricExporter::builder()
         .with_http()
@@ -45,12 +45,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
 
     meter_provider
         .shutdown()
-        .map_err(|_| "failed to shutdown meter provider")?;
+        .map_err(|e| format!("failed to shutdown meter provider: {e}"))?;
     Ok(())
 }
 
 async fn process_message(_message: Message) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let t = rand::random_range(1..3);
+    let t = rand::random_range(3..12);
 
     tokio::time::sleep(std::time::Duration::from_secs(t)).await;
     tracing::info!("look mom an async function: {:?}", t);
