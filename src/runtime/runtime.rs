@@ -10,12 +10,23 @@ use crate::aws::{AwsSqsClient, SqsClientConfig};
 use crate::runtime::{BatchDeleter, Poller, SignalManager, Timer};
 
 static DEFAULT_AWS_SQS_CONSUMER_POLLER_COUNT: usize = 1;
+static DEFAULT_AWS_SQS_CONSUMER_WORKER_COUNT: usize = 10;
+
+macro_rules! env_or_default {
+    ($env_var_name:literal, $default_expr:expr) => {{
+        match std::env::var($env_var_name) {
+            Ok(value) => value.parse().unwrap_or($default_expr),
+            Err(_) => $default_expr,
+        }
+    }};
+}
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
 pub struct Runtime<T> {
     set: TaskTracker,
     poller_count: usize,
+    worker_count: usize,
     future_fn: T,
 
     sqs_client_config: SqsClientConfig,
@@ -23,13 +34,12 @@ pub struct Runtime<T> {
 
 impl<T> Runtime<T> {
     pub fn new(future: T, sqs_client_config: SqsClientConfig) -> Self {
-        let poller_count = match std::env::var("AWS_SQS_CONSUMER_POLLER_COUNT") {
-            Ok(env) => env.parse().unwrap_or(DEFAULT_AWS_SQS_CONSUMER_POLLER_COUNT),
-            Err(_) => DEFAULT_AWS_SQS_CONSUMER_POLLER_COUNT,
-        };
+        let poller_count = env_or_default!("AWS_SQS_CONSUMER_POLLER_COUNT", DEFAULT_AWS_SQS_CONSUMER_POLLER_COUNT);
+        let worker_count = env_or_default!("AWS_SQS_CONSUMER_WORKER_COUNT", DEFAULT_AWS_SQS_CONSUMER_WORKER_COUNT);
 
         Self {
             poller_count,
+            worker_count,
             sqs_client_config,
             set: TaskTracker::new(),
             future_fn: future,
@@ -62,9 +72,7 @@ where
 
         self.set.spawn(SignalManager::new(notify.clone()));
 
-        let max_concurrency = self.poller_count * 4 + 1;
-        let semaphore = Arc::new(Semaphore::new(max_concurrency));
-
+        let semaphore = Arc::new(Semaphore::new(self.worker_count));
         loop {
             tokio::select! {
                 _ = notify.notified() => {
@@ -87,8 +95,7 @@ where
                     self.set.spawn(async move {
                         Self::run_internal(future_fn, msg, del_tx).await;
                         drop(permit);
-                    }
-                    );
+                    });
                 }
             }
         }

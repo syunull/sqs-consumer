@@ -68,10 +68,22 @@ impl SqsClient for AwsSqsClient {
         receipts: &mut Vec<DeleteMessageBatchRequestEntry>,
     ) -> Result<DeleteMessageBatchOutput, SdkError<DeleteMessageBatchError>> {
         let batch_size = std::cmp::min(10usize, receipts.len());
+
+        // messages in sqs are not guaranteed to be unique, so we need to remove duplicates
+        let mut receipts: Vec<DeleteMessageBatchRequestEntry> = receipts.drain(..batch_size).collect();
+        let before_count = receipts.len();
+        receipts.sort_by(|a, b| a.id.cmp(&b.id));
+        receipts.dedup_by(|a, b| a.id.eq(&b.id));
+        let after_count = receipts.len();
+
+        if before_count != after_count {
+            tracing::warn!("Duplicated receipts removed");
+        }
+
         self.inner
             .delete_message_batch()
             .queue_url(&self.queue_url)
-            .set_entries(Some(receipts.drain(..batch_size).collect()))
+            .set_entries(Some(receipts))
             .send()
             .await
     }
