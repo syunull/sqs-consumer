@@ -12,6 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
+      - run: docker load < $(nix build .#dockerImages.x86_64-linux.default --print-out-paths)
       - run: nix develop --command task
       - run: nix develop --command task shutdown
   pre-commit:
@@ -27,12 +28,3 @@ jobs:
           path: ~/.cache/pre-commit/
           key: pre-commit-${{ hashFiles('.pre-commit-config.yaml', 'flake.lock') }}
       - run: nix develop --command pre-commit run --all-files
-
-#      - run: docker images
-#      - run: nix build .#dockerImages.x86_64-linux.default
-#      - run: docker images
-#      - run: docker load < result || exit 0
-#      - run: docker images
-#      - run: docker run --name sqs-consumer sqs-consumer:0.1.0
-#      - run: docker ps -a
-#      - run: docker logs sqs-consumer

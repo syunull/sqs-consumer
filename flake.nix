@@ -71,16 +71,20 @@
       dockerImages = forAllSystems (
         { pkgs }:
         let
-          rustBin = self.packages.x86_64-linux.default;
+          rustBin = self.packages.${pkgs.system}.default;
         in
         {
           default = pkgs.dockerTools.buildImage {
             name = cargoToml.package.name;
             tag = cargoToml.package.version;
             created = "now";
+
             copyToRoot = pkgs.buildEnv {
               name = "${cargoToml.package.name}";
-              paths = [ rustBin ];
+              paths = [
+                rustBin
+                pkgs.cacert
+              ];
               pathsToLink = [ "/bin" ];
             };
             config.Cmd = [ "/bin/main" ];

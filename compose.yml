@@ -11,8 +11,9 @@ services:
       OTEL_SERVICE_NAME: sqs-consumer
       RUST_BACKTRACE: '1'
       RUST_LOG: none,sqs_consumer=debug,main=debug
-    build:
-      dockerfile: Dockerfile
+#    build:
+#      dockerfile: Dockerfile
+    image: sqs-consumer:0.1.0
     networks:
       - localstack
     depends_on:

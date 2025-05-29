@@ -37,12 +37,20 @@ where
                     break
                 }
 
-                Ok(messages) = self.client.receive_message() => {
-                    if let Some(messages) = messages.messages {
-                        for message in messages {
-                            if let Err(e) = self.channel.send(message).await {
-                                tracing::error!("failed to send internal message: {}", e);
+                result = self.client.receive_message() => {
+                    match result {
+                        Ok(messages) => {
+                            if let Some(messages) = messages.messages {
+                                for message in messages {
+                                    if let Err(e) = self.channel.send(message).await {
+                                        tracing::error!("failed to send internal message: {}", e);
+                                    }
+                                }
                             }
+                        }
+                        Err(e) => {
+                            tracing::error!("failed to receive messages: {}", e);
+                            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                         }
                     }
                 }
