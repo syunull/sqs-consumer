@@ -3,16 +3,24 @@ name = "sqs-consumer"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "sqs_consumer"
+path = "src/lib.rs"
+
+[[example]]
+name = "basic_consumer"
+path = "examples/basic_consumer.rs"
+
 [dependencies]
-async-trait = "0.1.88"
+async-trait = "0.1"
 aws-config = { version = "1", features = ["behavior-version-latest"] }
 aws-sdk-sqs = "1"
 opentelemetry = "0.30.0"
 opentelemetry-otlp = "0.30.0"
 opentelemetry_sdk = "0.30.0"
-pin-project = "1.1.10"
-rand = "0.9.1"
+pin-project = "1"
+rand = "0.9"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "tracing"] }
-tokio-util = { version = "0.7.15", features = ["rt"] }
+tokio-util = { version = "0.7", features = ["rt"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

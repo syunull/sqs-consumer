@@ -40,6 +40,7 @@
             cargoDeps = pkgs.rustPlatform.importCargoLock {
               lockFile = ./Cargo.lock;
             };
+            cargoBuildFlags = [ "--example" "basic_consumer" ];
           };
         }
       );
